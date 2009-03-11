@@ -11,7 +11,8 @@
 ;;  scgilardi (gmail)
 ;;  Created 3 October 2008
 
-(ns clojure.contrib.sql.internal)
+(ns clojure.contrib.sql.internal
+  (:use [clojure.contrib.except :only (throw-arg)]))
 
 (def *db* {:connection nil :level 0})
 
@@ -43,71 +44,90 @@
   (or (find-connection*)
       (throw (Exception. "no current database connection"))))
 
-(defn rollback-only
-  "Accessor for the rollback-only flag on the current connection"
+(defn rollback
+  "Accessor for the rollback flag on the current connection"
   ([]
-     (deref (:rollback-only *db*)))
+     (deref (:rollback *db*)))
   ([val]
-     (swap! (:rollback-only *db*) (fn [_] val))))
+     (swap! (:rollback *db*) (fn [_] val))))
+
+(defn get-connection
+  "Creates a connection to a database. db-spec is a map containing values
+  for one of the following parameter sets:
+
+  DataSource:
+    :datasource  (required) a javax.sql.DataSource
+    :username    (optional) a String
+    :password    (optional) a String
+
+  DriverManager:
+    :classname   (required) a String, the jdbc driver class name
+    :subprotocol (required) a String, the jdbc subprotocol
+    :subname     (required) a String, the jdbc subname
+    (others)     (optional) passed to the driver as properties."
+  [{:keys [datasource username password classname subprotocol subname]
+    :as db-spec}]
+  (when classname
+    (clojure.lang.RT/loadClassForName classname))
+  (if datasource
+    (if username
+      (.getConnection datasource username password)
+      (.getConnection datasource))
+    (java.sql.DriverManager/getConnection
+     (format "jdbc:%s:%s" subprotocol subname)
+     (properties (dissoc db-spec :classname :subprotocol :subname)))))
 
 (defn with-connection*
   "Evaluates func in the context of a new connection to a database then
-  closes the connection. db-spec is a map containing string values for
-  these required keys:
-    :classname     the jdbc driver class name
-    :subprotocol   the jdbc subprotocol
-    :subname       the jdbc subname
-  If db-spec contains additional keys (such as :user, :password, etc.) and
-  associated values, they will be passed along to the driver as properties."
-  [{:keys [classname subprotocol subname] :as db-spec} func]
-  (clojure.lang.RT/loadClassForName classname)
-  (with-open
-      [con
-       (java.sql.DriverManager/getConnection
-        (format "jdbc:%s:%s" subprotocol subname)
-        (properties (dissoc db-spec :classname :subprotocol :subname)))]
-    (binding [*db* (assoc *db* :connection con :level 0
-                          :rollback-only (atom false))]
+  closes the connection."
+  [db-spec func]
+  (with-open [con (get-connection db-spec)]
+    (binding [*db* (assoc *db*
+                     :connection con :level 0 :rollback (atom false))]
       (func))))
 
 (defn transaction*
   "Evaluates func as a transaction on the open database connection. Any
-  nested transactions are absorbed into the outermost transaction. All
-  database updates are committed together as a group after evaluating the
-  outermost func, or rolled back on any uncaught exception."
+  nested transactions are absorbed into the outermost transaction. By
+  default, all database updates are committed together as a group after
+  evaluating the outermost body, or rolled back on any uncaught
+  exception. If rollback is set within scope of the outermost transaction,
+  the entire transaction will be rolled back rather than committed when
+  complete."
   [func]
-  (io!
-   (let [con (connection*)
-         outermost (zero? (:level *db*))
-         auto-commit (when outermost (.getAutoCommit con))]
-     (binding [*db* (update-in *db* [:level] inc)]
-       (when outermost
-         (.setAutoCommit con false))
-       (try
-        (let [value (func)]
-          (when outermost
-            (if (rollback-only)
-              (.rollback con)
-              (.commit con)))
-          value)
-        (catch Exception e
-          (if outermost
-            (do
-              (.rollback con)
-              (throw (Exception.
-                      (format "transaction rolled back: %s"
-                              (.getMessage e)) e)))
-            (throw e)))
-        (finally
-         (when outermost
-           (rollback-only false)
-           (.setAutoCommit con auto-commit))))))))
+  (binding [*db* (update-in *db* [:level] inc)]
+    (if (= (:level *db*) 1)
+      (let [con (connection*)
+            auto-commit (.getAutoCommit con)]
+        (io!
+         (.setAutoCommit con false)
+         (try
+          (func)
+          (catch Exception e
+            (rollback true)
+            (throw
+             (Exception. (format "transaction rolled back: %s"
+                                 (.getMessage e)) e)))
+          (finally
+           (if (rollback)
+             (.rollback con)
+             (.commit con))
+           (rollback false)
+           (.setAutoCommit con auto-commit)))))
+      (func))))
 
 (defn with-query-results*
   "Executes a query, then evaluates func passing in a seq of the results as
   an argument. The first argument is a vector containing the (optionally
   parameterized) sql query string followed by values for any parameters."
-  [[sql & params] func]
+  [[sql & params :as sql-params] func]
+  (when-not (vector? sql-params)
+    (throw-arg "\"%s\" expected %s %s, found %s %s"
+               "sql-params"
+               "vector"
+               "[sql param*]"
+               (.getName (class sql-params))
+               (pr-str sql-params)))
   (with-open [stmt (.prepareStatement (connection*) sql)]
     (doseq [[index value] (map vector (iterate inc 1) params)]
       (.setObject stmt index value))

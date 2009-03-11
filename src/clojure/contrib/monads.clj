@@ -1,7 +1,7 @@
 ;; Monads in Clojure
 
 ;; by Konrad Hinsen
-;; last updated January 8, 2009
+;; last updated March 6, 2009
 
 ;; Copyright (c) Konrad Hinsen, 2009. All rights reserved.  The use
 ;; and distribution terms for this software are covered by the Eclipse
@@ -11,7 +11,8 @@
 ;; agreeing to be bound by the terms of this license.  You must not
 ;; remove this notice, or any other, from this software.
 
-(ns clojure.contrib.monads)
+(ns clojure.contrib.monads
+  (:require [clojure.contrib.accumulators]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -59,8 +60,7 @@
   [mexpr step]
   (let [[bform expr] step]
     (if (identical? bform :when)
-      (list 'm-bind `(if ~expr (~'m-result ::any) ~'m-zero)
-	    (list 'fn ['_] mexpr))
+      `(if ~expr ~mexpr ~'m-zero)
       (list 'm-bind expr (list 'fn [bform] mexpr)))))
 
 (defn- monad-expr
@@ -72,9 +72,19 @@
    [steps expr]
    (when (odd? (count steps))
      (throw (Exception. "Odd number of elements in monad comprehension steps")))
-   (reduce add-monad-step
-     (list 'm-result expr)
-     (reverse (partition 2 steps))))
+   (let [rsteps (reverse (partition 2 steps))
+	 [lr ls] (first rsteps)]
+     (if (= lr expr)
+       ; Optimization: if the result expression is equal to the result
+       ; of the last computation step, we can eliminate an m-bind to
+       ; m-result.
+       (reduce add-monad-step
+	       ls
+	       (rest rsteps))
+       ; The general case.
+       (reduce add-monad-step
+	       (list 'm-result expr)
+	       rsteps))))
 
 (defmacro with-monad
    "Evaluates an expression after replacing the keywords defining the
@@ -116,9 +126,8 @@
       `(defmonadfn ~doc-name ~args ~expr)))
 
   ([name args expr]
-   (let [fn-name (symbol (format "m+%s+m" (str name)))]
+   (let [fn-name (symbol (str *ns*) (format "m+%s+m" (str name)))]
    `(do
-      (def ~fn-name nil)
       (defmacro ~name ~args
         (list (quote ~fn-name)
 	      '~'m-bind '~'m-result '~'m-zero '~'m-plus
@@ -158,7 +167,7 @@
   (reduce (fn [q p]
 	    (m-bind p (fn [x]
 			(m-bind q (fn [y]
-				    (m-result (lazy-cons x y)))) )))
+				    (m-result (cons x y)))) )))
 	  (m-result '())
 	  (reverse ms)))
 
@@ -179,14 +188,36 @@
 	  m-result
 	  steps))
 
+(defmacro m-when
+  "If test if logical true, return monadic value m-expr, else return
+   (m-result nil)."
+  [test m-expr]
+  `(if ~test ~m-expr (~'m-result nil)))
+
+(defmacro m-when-not
+  "If test if logical false, return monadic value m-expr, else return
+   (m-result nil)."
+  [test m-expr]
+  `(if ~test (~'m-result nil) ~m-expr))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Commonly used monads
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; Identity monad
+(defmonad identity-m
+   "Monad describing plain computations. This monad does in fact nothing
+    at all. It is useful for testing, for combination with monad
+    transformers, and for code that is parameterized with a monad."
+  [m-result identity
+   m-bind   (fn m-result-id [mv f]
+	      (f mv))
+  ])
+
 ; Maybe monad
-(defmonad maybe
+(defmonad maybe-m
    "Monad describing computations with possible failures. Failure is
     represented by nil, any other value is considered valid. As soon as
     a step returns nil, the whole computation will yield nil as well."
@@ -199,7 +230,7 @@
     ])
 
 ; Sequence monad (called "list monad" in Haskell)
-(defmonad sequence
+(defmonad sequence-m
    "Monad describing multi-valued computations, i.e. computations
     that can yield multiple values. Any object implementing the seq
     protocol can be used as a monadic value."
@@ -212,8 +243,21 @@
                (apply concat mvs))
     ])
 
+; Set monad
+(defmonad set-m
+   "Monad describing multi-valued computations, like sequence-m,
+    but returning sets of results instead of sequences of results."
+   [m-result (fn m-result-set [v]
+	       #{v})
+    m-bind   (fn m-bind-set [mv f]
+               (apply clojure.set/union (map f mv)))
+    m-zero   #{}
+    m-plus   (fn m-plus-set [& mvs]
+               (apply clojure.set/union mvs))
+    ])
+
 ; State monad
-(defmonad state
+(defmonad state-m
    "Monad describing stateful computations. The monadic values have the
     structure (fn [old-state] (list result new-state))."
    [m-result  (fn m-result-state [v]
@@ -233,6 +277,61 @@
 (defn fetch-state []
   (update-state identity))
 
+; Writer monad
+(defn writer-m
+  "Monad describing computations that accumulate data on the side, e.g. for
+   logging. The monadic values have the structure [value log]. Any of the
+   accumulators from clojure.contrib.accumulators can be used for storing the
+   log data. Its empty value is passed as a parameter."
+  [empty-accumulator]
+  (monad
+     [m-result  (fn m-result-writer [v]
+	          [v empty-accumulator])
+      m-bind    (fn m-bind-writer [mv f]
+	          (let [[v1 a1] mv
+			[v2 a2] (f v1)]
+		    [v2 (clojure.contrib.accumulators/combine a1 a2)]))
+     ]))
+
+(defmonadfn write [v]
+  (let [[_ a] (m-result nil)]
+    [nil (clojure.contrib.accumulators/add a v)]))
+
+(defn listen [mv]
+  (let [[v a] mv] [[v a] a]))
+
+(defn censor [f mv]
+  (let [[v a] mv] [v (f a)]))
+
+; Continuation monad
+
+(defmonad cont-m
+  "Monad describing computations in continuation-passing style. The monadic
+   values are functions that are called with a single argument representing
+   the continuation of the computation, to which they pass their result."
+  [m-result   (fn m-result-cont [v]
+		(fn [c] (c v)))
+   m-bind     (fn m-bind-cont [mv f]
+		(fn [c]
+		  (mv (fn [v] ((f v) c)))))
+   ])
+
+(defn run-cont
+  "Execute the computation c in the cont monad and return its result."
+  [c]
+  (c identity))
+
+(defn call-cc
+  "A computation in the cont monad that calls function f with a single
+   argument representing the current continuation. The function f should
+   return a continuation (which becomes the return value of call-cc),
+   or call the passed-in current continuation to terminate."
+  [f]
+  (fn [c]
+    (let [cc (fn cc [a] (fn [_] (c a)))
+	  rc (f cc)]
+      (rc c))))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -242,14 +341,85 @@
 
 (defn maybe-t
   "Monad transformer that transforms a monad m into a monad in which
-   the base values can be invalid (represented by nil)."
+   the base values can be invalid (represented by nothing, which defaults
+   to nil). The third argument chooses if m-zero and m-plus are inherited
+   from the base monad (use :m-plus-from-base) or adopt maybe-like
+   behaviour (use :m-plus-from-maybe)."
+  ([m] (maybe-t m nil :m-plus-from-base))
+  ([m nothing which-m-plus]
+   (let [combined-m-zero
+	 (cond
+	  (identical? which-m-plus :m-plus-from-base)
+	  (with-monad m m-zero)
+	  (identical? which-m-plus :m-plus-from-maybe)
+	  (with-monad m (m-result nothing))
+	  :else ::undefined)
+	 combined-m-plus
+	 (cond
+	  (identical? which-m-plus :m-plus-from-base)
+	  (with-monad m m-plus)
+	  (identical? which-m-plus :m-plus-from-maybe)
+	  (with-monad m
+	    (fn [& mvs]
+	      (m-result (loop [mv (first mvs)]
+			  (if (nil? mv)
+			    nothing
+			    (let [v (m-bind mv identity)]
+			      (if (identical? v nothing)
+				(recur (rest mvs))
+				v)))))))
+	  :else ::undefined)]
+     (monad [m-result (with-monad m
+		        m-result)
+	     m-bind   (with-monad m
+		        (fn m-bind-maybe-t [mv f]
+			  (m-bind mv
+				  (fn [x]
+				    (if (identical? x nothing)
+				      (m-result nothing)
+				      (f x))))))
+	     m-zero   combined-m-zero
+	     m-plus   combined-m-plus
+	     ]))))
+
+(defn sequence-t
+  "Monad transformer that transforms a monad m into a monad in which
+   the base values are sequences."
   [m]
   (monad [m-result (with-monad m
-		     m-result)
+		     (fn m-result-sequence-t [v]
+		       (m-result (list v))))
 	  m-bind   (with-monad m
-		     (fn m-bind-maybe-t [mv f]
+		     (fn m-bind-sequence-t [mv f]
 		       (m-bind mv
-			       (fn [x]
-				 (if (nil? x) (m-result nil) (f x))))))
-	  m-zero   (with-monad m m-zero)
-	  m-plus   (with-monad m m-plus)]))
+			       (fn [xs]
+				 (apply concat (map f xs))))))
+	  ]))
+
+;; Contributed by Jim Duey
+(defn state-t
+  "Monad transformer that transforms a monad m into a monad of stateful
+  computations that have the base monad type as their result."
+  [m]
+  (monad [m-result (with-monad m
+		     (fn m-result-state-t [v]
+                       (fn [s]
+			 (m-result (list v s)))))
+	  m-bind   (with-monad m
+                     (fn m-bind-state-t [stm f]
+                       (fn [s]
+                         (m-bind (stm s)
+                                 (fn [[v ss]]
+                                   ((f v) ss))))))
+          m-zero   (with-monad m
+                     (if (= ::undefined m-zero)
+		       ::undefined
+		       (fn [s]
+			 m-zero)))
+          m-plus   (with-monad m
+                     (if (= ::undefined m-plus)
+		       ::undefined
+		       (fn [& stms]
+			 (fn [s]
+			   (apply m-plus (map #(% s) stms))))))
+          ]))

@@ -31,6 +31,12 @@
 
 ;; Literals
 
+(deftest Literals
+  ; 'nil 'false 'true are reserved by Clojure and are not symbols
+  (is (= 'nil nil))
+  (is (= 'false false))
+  (is (= 'true true)) )
+
 ;; Strings
 
 (deftest Strings
@@ -53,19 +59,43 @@
   (is (instance? Integer -1))
   (is (instance? Integer -2147483648))
 
+  ; Read Long
+  (is (instance? Long 2147483648))
+  (is (instance? Long -2147483649))
+  (is (instance? Long 9223372036854775807))
+  (is (instance? Long -9223372036854775808))
+
+  ;; Numeric constants of different types don't wash out. Regression fixed in
+  ;; r1157. Previously the compiler saw 0 and 0.0 as the same constant and
+  ;; caused the sequence to be built of Doubles.
+  (let [x 0.0]
+    (let [sequence (loop [i 0 l '()]
+                     (if (< i 5)
+                       (recur (inc i) (conj l i))
+                       l))]
+      (is (= [4 3 2 1 0] sequence))
+      (is (every? #(instance? Integer %)
+                  sequence))))
+
   ; Read BigInteger
-  (is (instance? BigInteger 2147483648))
-  (is (instance? BigInteger -2147483649))
+  (is (instance? BigInteger 9223372036854775808))
+  (is (instance? BigInteger -9223372036854775809))
+  (is (instance? BigInteger 10000000000000000000000000000000000000000000000000))
+  (is (instance? BigInteger -10000000000000000000000000000000000000000000000000))
 
   ; Read Double
+  (is (instance? Double +1.0e1))
   (is (instance? Double +1.0))
   (is (instance? Double 1.0))
   (is (instance? Double +0.0))
   (is (instance? Double 0.0))
   (is (instance? Double -0.0))
   (is (instance? Double -1.0))
+  (is (instance? Double -1.0e1))
 
   ; Read BigDecimal
+  (is (instance? BigDecimal 9223372036854775808M))
+  (is (instance? BigDecimal -9223372036854775809M))
   (is (instance? BigDecimal 2147483647M))
   (is (instance? BigDecimal +1M))
   (is (instance? BigDecimal 1M))
@@ -81,7 +111,6 @@
   (is (instance? BigDecimal -0.0M))
   (is (instance? BigDecimal -1.0M))
 )
-
 
 ;; Characters
 

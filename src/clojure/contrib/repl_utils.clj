@@ -9,10 +9,11 @@
 ; Utilities meant to be used interactively at the REPL
 
 (ns clojure.contrib.repl-utils
-  (:import (java.io LineNumberReader InputStreamReader PushbackReader)
+  (:import (java.io File LineNumberReader InputStreamReader PushbackReader)
            (java.lang.reflect Modifier Method Constructor)
            (clojure.lang RT))
   (:use [clojure.contrib.seq-utils :only (indexed)]
+        [clojure.contrib.javadoc.browse :only (browse-url)]
         [clojure.contrib.str-utils :only (str-join re-sub re-partition)]))
 
 (defn- sortable [t]
@@ -32,7 +33,7 @@
                                [] (.getParameterTypes m))))
   ")"))
 
-(defn- member-vec [m]
+(defn- member-details [m]
   (let [static? (Modifier/isStatic (.getModifiers m))
         method? (instance? Method m)
         ctor?   (instance? Constructor m)
@@ -44,29 +45,45 @@
                  (if method?
                    (str (.getSimpleName (.getReturnType m)) (param-str m))
                    (str (.getSimpleName (.getType m))))))]
-    [[(not static?) method? (sortable text)] text m]))
+    (assoc (bean m)
+           :sort-val [(not static?) method? (sortable text)]
+           :text text
+           :member m)))
 
 (defn show
-  "With one arg, lists all static and instance members of the given
-  class, or the class of the given object.  Each entry is listed with
-  a number.  Use that number as the second argument, and that member
-  will be returned which at the REPL will cause more detail to be
-  printed.
+  "With one arg prints all static and instance members of x or (class x).
+  Each member is listed with a number which can be given as 'selector'
+  to return the member object -- the REPL will print more details for
+  that member.
 
-  Examples: (show Integer)  (show [])  (show String 23)"
-  ([x] (show x nil))
-  ([x i]
+  The selector also may be a string or regex, in which case only
+  members whose names match 'selector' as a case-insensitive regex
+  will be printed.
+
+  Finally, the selector also may be a predicate, in which case only
+  members for which the predicate returns true will be printed.  The
+  predicate will be passed a single argument, a map that includes the
+  :text that will be printed and the :member object itself, as well as
+  all the properies of the member object as translated by 'bean'.
+
+  Examples: (show Integer)  (show [])  (show String 23)  (show String \"case\")"
+  ([x] (show x (constantly true)))
+  ([x selector]
       (let [c (if (class? x) x (class x))
-            items (sort (for [m (concat (.getFields c)
-                                        (.getMethods c)
-                                        (.getConstructors c))]
-                          (member-vec m)))]
-        (if i
-          (last (nth items i))
-          (do
+            members (sort-by :sort-val
+                             (map member-details
+                                  (concat (.getFields c)
+                                          (.getMethods c)
+                                          (.getConstructors c))))]
+        (if (number? selector)
+          (:member (nth members selector))
+          (let [pred (if (ifn? selector)
+                       selector
+                       #(re-find (re-pattern (str "(?i)" selector)) (:name %)))]
             (println "=== " (Modifier/toString (.getModifiers c)) c " ===")
-            (doseq [[i e] (indexed items)]
-              (printf "[%2d] %s\n" i (second e))))))))
+            (doseq [[i m] (indexed members)]
+              (when (pred m)
+                (printf "[%2d] %s\n" i (:text m)))))))))
 
 (defn get-source
   "Returns a string of the source code for the given symbol, if it can
@@ -78,8 +95,11 @@
   Example: (get-source 'filter)"
   [x]
   (when-let [v (resolve x)]
-    (let [ns-name (str (.name (.ns v)))
-          path (first (re-seq #"^.*(?=/[^/]*$)" (.replace ns-name "." "/")))
+    (let [ns-str (str (ns-name (:ns ^v)))
+          path (first (re-seq #"^.*(?=/[^/]*$)"
+                              (-> ns-str
+                                (.replace "." "/")
+                                (.replace "-" "_"))))
           fname (str path "/" (:file ^v))]
       (when-let [strm (.getResourceAsStream (RT/baseLoader) fname)]
         (with-open [rdr (LineNumberReader. (InputStreamReader. strm))]
@@ -100,3 +120,37 @@
   Example: (source filter)"
   [n]
   `(println (or (get-source '~n) (str "Source not found"))))
+
+
+(def #^{:doc "Threads to stop when Ctrl-C is pressed.  See 'add-break-thread!'"}
+  break-threads (ref nil))
+
+(defn start-handling-break
+  "Register INT signal handler.  After calling this, Ctrl-C will cause
+  all break-threads to be stopped.  See 'add-break-thread!'"
+  []
+  (when-not
+    (dosync
+      (let [inited @break-threads]
+        (ref-set break-threads {})
+        inited))
+    (sun.misc.Signal/handle
+      (sun.misc.Signal. "INT")
+      (proxy [sun.misc.SignalHandler] []
+        (handle [sig]
+          (let [exc (Exception. (str sig))]
+            (doseq [tref (vals @break-threads) :when (.get tref)]
+              (.stop (.get tref) exc))))))))
+
+(defn add-break-thread!
+  "Add the given thread to break-threads so that it will be stopped
+  any time the user presses Ctrl-C.  Calls start-handling-break for
+  you.  Adds the current thread if none is give."
+  ([] (add-break-thread! (Thread/currentThread)))
+  ([t]
+    (start-handling-break)
+    (let [tref (java.lang.ref.WeakReference. t)]
+      (dosync (commute break-threads assoc (.getId t) tref)))))
+
+
+(load "repl_utils/javadoc")

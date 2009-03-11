@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Clojure Contrib Plug-in
 Bundle-SymbolicName: clojurecontrib;singleton:=true
-Bundle-Version: 0.0.0.20090120_r394
+Bundle-Version: 0.0.0.20090311_r585
 Bundle-ClassPath: .
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: clojure.contrib.util.ClojureContribPlugin

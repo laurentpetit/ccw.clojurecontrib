@@ -21,9 +21,8 @@
 ;;
 ;;  == Lazy sequence functions ==
 ;;
-;;  rotations - returns a lazy seq of all the rotations of a seq
-;;
-;;  permutations - returns a lazy seq of all the permutations of a seq
+;;  (rotations, partition-all, shuffle, rand-elt  moved to seq_utils.clj)
+;;  (permutations and combinations moved to combinatorics.clj)
 ;;
 ;;  [1] http://www.cs.hmc.edu/~oneill/papers/Sieve-JFP.pdf
 ;;  [2] http://clj-me.blogspot.com/2008/06/primes.html
@@ -41,7 +40,7 @@
             (if (some #(zero? (rem n %))
                       (take-while #(<= (* % %) n) primes))
               (recur (+ n f) r)
-              (lazy-cons n (primes-from (+ n f) r))))
+              (lazy-seq (cons n (primes-from (+ n f) r)))))
           wheel (cycle [2 4 2 4 6 2 6 4 2 4 6 6 2 6  4  2
                         6 4 6 8 4 2 4 2 4 8 6 4 6 2  4  6
                         2 6 6 4 2 4 6 2 6 4 2 4 2 10 2 10])]
@@ -53,36 +52,5 @@
   "A lazy sequence of all the fibonacci numbers.")
 
 (defvar powers-of-2
-  (lazy-cons 1 (map #(bit-shift-left % 1) powers-of-2))
+  (lazy-seq (cons 1 (map #(bit-shift-left % 1) powers-of-2)))
   "A lazy sequence of all the powers of 2")
-
-(defn rotations
-  "Returns a lazy seq of all rotations of a seq"
-  [x]
-  (if (seq x)
-    (map
-     (fn [n _]
-       (lazy-cat (drop n x) (take n x)))
-     (iterate inc 0) x)
-    (list nil)))
-
-(defn permutations
-  "Returns a lazy seq of all permutations of a seq"
-  [x]
-  (if (seq x)
-    (mapcat
-     (fn [[f & r]]
-       (map #(cons f %) (permutations r)))
-     (rotations x))
-    (list nil)))
-
-(defn combinations
-  "Returns a lazy seq of all combinations built of one item from each seq given.
-   See also (doc for)"
-  [& acs]
-  (let [step (fn step [head [s & cs :as acs]]
-               (if acs
-                 (mapcat #(step (conj head %) cs) s)
-                 (list head)))]
-    (when acs
-      (step [] acs))))

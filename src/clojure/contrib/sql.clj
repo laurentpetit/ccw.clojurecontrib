@@ -24,21 +24,30 @@
 
 (defmacro with-connection
   "Evaluates body in the context of a new connection to a database then
-  closes the connection. db-spec is a map containing string values for
-  these required keys:
-    :classname     the jdbc driver class name
-    :subprotocol   the jdbc subprotocol
-    :subname       the jdbc subname
-  If db-spec contains additional keys (such as :user, :password, etc.) and
-  associated values, they will be passed along to the driver as properties."
+  closes the connection. db-spec is a map containing values for one of the
+  following parameter sets:
+
+  DataSource:
+    :datasource  (required) a javax.sql.DataSource
+    :username    (optional) a String
+    :password    (optional) a String
+
+  DriverManager:
+    :classname   (required) a String, the jdbc driver class name
+    :subprotocol (required) a String, the jdbc subprotocol
+    :subname     (required) a String, the jdbc subname
+    (others)     (optional) passed to the driver as properties."
   [db-spec & body]
   `(with-connection* ~db-spec (fn [] ~@body)))
 
 (defmacro transaction
   "Evaluates body as a transaction on the open database connection. Any
-  nested transactions are absorbed into the outermost transaction. All
-  database updates are committed together as a group after evaluating the
-  outermost body, or rolled back on any uncaught exception."
+  nested transactions are absorbed into the outermost transaction. By
+  default, all database updates are committed together as a group after
+  evaluating the outermost body, or rolled back on any uncaught
+  exception. If set-rollback-only is called within scope of the outermost
+  transaction, the entire transaction will be rolled back rather than
+  committed when complete."
   [& body]
   `(transaction* (fn [] ~@body)))
 
@@ -46,13 +55,13 @@
   "Marks the outermost transaction such that it will rollback rather than
   commit when complete"
   []
-  (rollback-only true))
+  (rollback true))
 
 (defn is-rollback-only
   "Returns true if the outermost transaction will rollback rather than
   commit when complete"
   []
-  (rollback-only))
+  (rollback))
 
 (defn do-commands
   "Executes SQL commands on the open database connection."
@@ -122,6 +131,13 @@
   each of the table's columns in order."
   [table & rows]
   (apply insert-values table nil rows))
+
+(defn insert-records
+  "Inserts records into a table. records are maps from strings or
+  keywords (identifying columns) to values."
+  [table & records]
+  (doseq [record records]
+    (insert-values table (keys record) (vals record))))
 
 (defn delete-rows
   "Deletes rows from a table. where-params is a vector containing a string
