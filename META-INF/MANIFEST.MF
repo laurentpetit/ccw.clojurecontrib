@@ -3,9 +3,12 @@ Bundle-ManifestVersion: 2
 Bundle-Name: Clojure Contrib Plug-in
 Bundle-SymbolicName: clojurecontrib;singleton:=true
 Bundle-Version: 0.0.0.20090311_r585
-Bundle-ClassPath: .
+Bundle-ClassPath: .,
+ classes/
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: clojure.contrib.util.ClojureContribPlugin
 Require-Bundle: org.eclipse.core.runtime;bundle-version="3.4.0",
  clojure;bundle-version="0.0.0"
 Bundle-RequiredExecutionEnvironment: J2SE-1.5
+Eclipse-RegisterBuddy: clojure
+Export-Package: clojure.contrib
