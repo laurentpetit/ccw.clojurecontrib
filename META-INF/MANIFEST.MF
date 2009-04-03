@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Clojure Contrib Plug-in
 Bundle-SymbolicName: clojurecontrib;singleton:=true
-Bundle-Version: 0.0.0.20090315_r593
+Bundle-Version: 0.0.0.20090404_r633
 Bundle-ClassPath: .,
  clojure-contrib.jar
 Bundle-ActivationPolicy: lazy
@@ -13,6 +13,7 @@ Bundle-RequiredExecutionEnvironment: J2SE-1.5
 Eclipse-RegisterBuddy: clojure
 Export-Package: clojure.contrib,
  clojure.contrib.accumulators,
+ clojure.contrib.core,
  clojure.contrib.datalog,
  clojure.contrib.datalog.tests,
  clojure.contrib.generic,
