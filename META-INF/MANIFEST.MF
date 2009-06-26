@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Clojure Contrib Plug-in
 Bundle-SymbolicName: clojurecontrib;singleton:=true
-Bundle-Version: 0.0.0.20090404_r633
+Bundle-Version: 0.0.0.20090504_r756
 Bundle-ClassPath: .,
  clojure-contrib.jar
 Bundle-ActivationPolicy: lazy
@@ -23,13 +23,15 @@ Export-Package: clojure.contrib,
  clojure.contrib.math,
  clojure.contrib.miglayout,
  clojure.contrib.monads,
+ clojure.contrib.pprint,
+ clojure.contrib.pprint.examples,
  clojure.contrib.probabilities,
- clojure.contrib.probabilities.dist,
  clojure.contrib.repl_utils,
  clojure.contrib.sql,
  clojure.contrib.stream_utils,
  clojure.contrib.test_clojure,
  clojure.contrib.test_contrib,
+ clojure.contrib.test_contrib.pprint,
  clojure.contrib.test_is,
  clojure.contrib.types,
  clojure.contrib.util,
