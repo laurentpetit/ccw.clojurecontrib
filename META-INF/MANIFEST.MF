@@ -1,17 +1,18 @@
 Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Clojure Contrib Plug-in
-Bundle-SymbolicName: clojurecontrib;singleton:=true
+Bundle-SymbolicName: ccw.clojurecontrib;singleton:=true
 Bundle-Version: 0.0.0.20090504_r756
 Bundle-ClassPath: .,
  clojure-contrib.jar
 Bundle-ActivationPolicy: lazy
-Bundle-Activator: clojure.contrib.util.ClojureContribPlugin
+Bundle-Activator: ccw.clojurecontrib.util.ClojureContribPlugin
 Require-Bundle: org.eclipse.core.runtime;bundle-version="3.4.0",
- clojure;bundle-version="0.0.0"
+ ccw.clojure;bundle-version="1.0.0"
 Bundle-RequiredExecutionEnvironment: J2SE-1.5
-Eclipse-RegisterBuddy: clojure
-Export-Package: clojure.contrib,
+Eclipse-RegisterBuddy: ccw.clojure
+Export-Package: ccw.clojurecontrib.util,
+ clojure.contrib,
  clojure.contrib.accumulators,
  clojure.contrib.core,
  clojure.contrib.datalog,
@@ -34,7 +35,6 @@ Export-Package: clojure.contrib,
  clojure.contrib.test_contrib.pprint,
  clojure.contrib.test_is,
  clojure.contrib.types,
- clojure.contrib.util,
  clojure.contrib.zip_filter,
  clojure.proxy.java.io,
  clojure.proxy.java.lang,
