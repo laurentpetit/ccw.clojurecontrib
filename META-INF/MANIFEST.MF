@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Clojure Contrib Plug-in
 Bundle-SymbolicName: ccw.clojurecontrib;singleton:=true
-Bundle-Version: 1.1.0.RC2
+Bundle-Version: 1.1.0.S
 Bundle-ClassPath: .,
  clojure-contrib.jar
 Bundle-ActivationPolicy: lazy
@@ -13,9 +13,7 @@ Bundle-RequiredExecutionEnvironment: J2SE-1.5
 Eclipse-RegisterBuddy: ccw.clojure
 Export-Package: ccw.clojurecontrib.util,
  clojure.contrib,
- clojure.contrib.accumulators,
  clojure.contrib.condition,
- clojure.contrib.core,
  clojure.contrib.datalog,
  clojure.contrib.datalog.tests,
  clojure.contrib.error_kit.proxy$java.lang,
@@ -26,15 +24,10 @@ Export-Package: ccw.clojurecontrib.util,
  clojure.contrib.javadoc.browse_ui.proxy$java.lang,
  clojure.contrib.jmx,
  clojure.contrib.json,
- clojure.contrib.lazy_xml,
  clojure.contrib.lazy_xml.proxy$org.xml.sax.helpers,
- clojure.contrib.math,
  clojure.contrib.miglayout,
  clojure.contrib.mmap.proxy$java.io,
- clojure.contrib.mock,
- clojure.contrib.monads,
  clojure.contrib.pprint,
- clojure.contrib.pprint.examples,
  clojure.contrib.pprint.proxy$java.io,
  clojure.contrib.probabilities,
  clojure.contrib.repl_utils,
@@ -42,12 +35,7 @@ Export-Package: ccw.clojurecontrib.util,
  clojure.contrib.repl_utils.proxy$java.lang,
  clojure.contrib.singleton.proxy$java.lang,
  clojure.contrib.sql,
- clojure.contrib.stream_utils,
  clojure.contrib.swing_utils.proxy$java.awt.event,
  clojure.contrib.swing_utils.proxy$java.lang,
  clojure.contrib.swing_utils.proxy$javax.swing,
- clojure.contrib.test_contrib,
- clojure.contrib.test_contrib.mock_test,
- clojure.contrib.test_contrib.pprint,
- clojure.contrib.types,
  clojure.contrib.zip_filter
