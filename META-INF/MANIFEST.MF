@@ -2,40 +2,34 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Clojure Contrib Plug-in
 Bundle-SymbolicName: ccw.clojurecontrib;singleton:=true
-Bundle-Version: 1.1.0.S
+Bundle-Version: 1.2.0.COMMIT-4fe738db417cbea76450e04223fdcc9ed0b2c053
 Bundle-ClassPath: .,
  clojure-contrib.jar
 Bundle-ActivationPolicy: lazy
 Bundle-Activator: ccw.clojurecontrib.util.ClojureContribPlugin
 Require-Bundle: org.eclipse.core.runtime;bundle-version="3.4.0",
- ccw.clojure;bundle-version="1.1.0"
+ ccw.clojure;bundle-version="1.2.0"
 Bundle-RequiredExecutionEnvironment: J2SE-1.5
 Eclipse-RegisterBuddy: ccw.clojure
 Export-Package: ccw.clojurecontrib.util,
  clojure.contrib,
+ clojure.contrib.accumulators,
  clojure.contrib.condition,
  clojure.contrib.datalog,
- clojure.contrib.datalog.tests,
- clojure.contrib.error_kit.proxy$java.lang,
  clojure.contrib.fnmap,
  clojure.contrib.generic,
  clojure.contrib.http,
  clojure.contrib.javadoc,
- clojure.contrib.javadoc.browse_ui.proxy$java.lang,
  clojure.contrib.jmx,
- clojure.contrib.json,
- clojure.contrib.lazy_xml.proxy$org.xml.sax.helpers,
+ clojure.contrib.lazy_xml,
  clojure.contrib.miglayout,
- clojure.contrib.mmap.proxy$java.io,
+ clojure.contrib.mock,
+ clojure.contrib.monads,
  clojure.contrib.pprint,
- clojure.contrib.pprint.proxy$java.io,
+ clojure.contrib.pprint.examples,
  clojure.contrib.probabilities,
  clojure.contrib.repl_utils,
- clojure.contrib.repl_utils.proxy$java.io,
- clojure.contrib.repl_utils.proxy$java.lang,
- clojure.contrib.singleton.proxy$java.lang,
  clojure.contrib.sql,
- clojure.contrib.swing_utils.proxy$java.awt.event,
- clojure.contrib.swing_utils.proxy$java.lang,
- clojure.contrib.swing_utils.proxy$javax.swing,
+ clojure.contrib.stream_utils,
+ clojure.contrib.types,
  clojure.contrib.zip_filter
