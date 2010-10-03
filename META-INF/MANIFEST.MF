@@ -6,13 +6,9 @@ Bundle-Version: 1.2.0.STABLE01
 Bundle-ClassPath: .,
  clojure-contrib.jar
 Bundle-ActivationPolicy: lazy
-Bundle-Activator: ccw.clojurecontrib.util.ClojureContribPlugin
-Require-Bundle: org.eclipse.core.runtime;bundle-version="3.4.0",
- ccw.clojure;bundle-version="1.2.0"
+Require-Bundle: ccw.clojure;bundle-version="1.2.0"
 Bundle-RequiredExecutionEnvironment: J2SE-1.5
-Eclipse-RegisterBuddy: ccw.clojure
-Export-Package: ccw.clojurecontrib.util,
- clojure.contrib,
+Export-Package: clojure.contrib,
  clojure.contrib.accumulators,
  clojure.contrib.condition,
  clojure.contrib.datalog,
